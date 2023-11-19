@@ -2,62 +2,270 @@
 #include <sqlite3.h>
 #include <iostream>
 #include <memory>
+#include <vector>
+#include <sstream>
 
 class InventoryService {
   public: InventoryService(sqlite3 * db): db_(db) {}
 
   void addProduct() {
-    std::cout << "Add a product\n";
+      std::string productName;
+      float price;
+      int supplierId;
+
+      std::cout << "Enter product name: ";
+      std::getline(std::cin >> std::ws, productName);
+      std::cout << "Enter price: ";
+      std::cin >> price;
+      std::cout << "Enter supplier id: ";
+      std::cin >> supplierId;
+
+      // Implement logic to add a product to the database
+      executeQuery("INSERT INTO Products (name, price, supplier_id) VALUES (?, ?, ?);", productName, price, supplierId);
+
+      std::cout << "Product added successfully.\n";
   }
 
   void removeProduct() {
-    std::cout << "Remove a product\n";
+      int productId;
+
+      std::cout << "Enter product id to remove: ";
+      std::cin >> productId;
+
+      // Implement logic to remove a product from the database
+      executeQuery("DELETE FROM Products WHERE id = ?;", productId);
+
+      std::cout << "Product removed successfully.\n";
   }
 
+  // TODO: Fix list products
   void listProducts() {
-    std::cout << "List all products\n";
+    std::cout << "Product List:\n";
+    std::cout << "ID - Name - Price\n";
+
+    executeQuery("SELECT id, name, price FROM Products;", [](void* data, int argc, char** argv, char** /*azColName*/) -> int {
+        for (int i = 0; i < argc; ++i) {
+            std::cout << argv[i];
+            if (i < argc - 1) {
+                std::cout << " - ";
+            }
+        }
+        std::cout << "\n";
+        return 0;
+    });
   }
 
   void addSupplier() {
-    std::cout << "Add a supplier\n";
+      std::string supplierName;
+
+      std::cout << "Enter supplier name: ";
+      std::getline(std::cin >> std::ws, supplierName);
+
+      // Implement logic to add a supplier to the database
+      executeQuery("INSERT INTO Suppliers (name) VALUES (?);", supplierName);
+
+      std::cout << "Supplier added successfully.\n";
   }
 
   void removeSupplier() {
-    std::cout << "Remove a supplier\n";
+      int supplierId;
+
+      std::cout << "Enter supplier id to remove: ";
+      std::cin >> supplierId;
+
+      // Implement logic to remove a supplier from the database
+      executeQuery("DELETE FROM Suppliers WHERE id = ?;", supplierId);
+
+      std::cout << "Supplier removed successfully.\n";
   }
 
   private: sqlite3 * db_;
+  // Utility function to execute SQL queries
+  template <typename... Args>
+  void executeQuery(const std::string& query, const Args&... args) const {
+      char* errorMessage = nullptr;
+      std::string formattedQuery = formatQuery(query, args...);
+      int rc = sqlite3_exec(db_, formattedQuery.c_str(), nullptr, nullptr, &errorMessage);
+      if (rc != SQLITE_OK) {
+          std::cerr << "SQLite error: " << errorMessage << std::endl;
+          sqlite3_free(errorMessage);
+      }
+  }
+
+  // Utility function to format SQL queries with parameters
+  template <typename... Args>
+  std::string formatQuery(const std::string& query, const Args&... args) const {
+      std::stringstream formattedQuery;
+      int argIndex = 0;
+      for (char ch : query) {
+          if (ch == '?') {
+              formattedQuery << argsToSql(args...)[argIndex++];
+          } else {
+              formattedQuery << ch;
+          }
+      }
+      return formattedQuery.str();
+  }
+
+  // Utility function to convert arguments to SQL string representations
+  template <typename... Args>
+  std::vector<std::string> argsToSql(const Args&... args) const {
+      return { toString(args)... };
+  }
+
+  // Utility function to convert a value to a string
+  template <typename T>
+  std::string toString(const T& value) const {
+      std::stringstream ss;
+      if constexpr (std::is_arithmetic<T>::value) {
+          ss << value;
+      } else {
+          ss << "'" << value << "'";
+      }
+      return ss.str();
+  }
 };
 
 class OrderService {
   public: OrderService(sqlite3 * db): db_(db) {}
+
   void createOrder() {
-    std::cout << "Create an order\n";
+      int productId;
+      int customerId;
+      float totalPrice;
+
+      std::cout << "Enter product id: ";
+      std::cin >> productId;
+      std::cout << "Enter customer id: ";
+      std::cin >> customerId;
+      std::cout << "Enter total price: ";
+      std::cin >> totalPrice;
+
+      // Implement logic to add a product to the database
+      executeQuery("INSERT INTO Orders (product_id, customer_id, total_price) VALUES (?, ?, ?);", productId, customerId, totalPrice);
+
+      std::cout << "Created order successfully.\n";
   }
 
-  void updateStatus() {
-    std::cout << "Update order status\n";
+  void removeOrder() {
+    int orderId;
+
+    std::cout << "Enter product id to remove: ";
+    std::cin >> orderId;
+
+    // Implement logic to remove a product from the database
+    executeQuery("DELETE FROM Orders WHERE id = ?;", orderId);
+
+    std::cout << "Order removed successfully.\n";
   }
 
   void listOrders() {
-    std::cout << "List all orders\n";
+    std::cout << "List all orders:\n";
+    executeQuery("SELECT * FROM Orders;", [](void* data, int argc, char** argv, char** /*azColName*/) -> int {
+        for (int i = 0; i < argc; ++i) {
+            std::cout << argv[i] << ": " << argv[i + 1] << "\n";
+            ++i; // Skip the value
+        }
+        return 0;
+    });
   }
 
   private: sqlite3 * db_;
+  // Utility function to execute SQL queries
+  template <typename... Args>
+  void executeQuery(const std::string& query, const Args&... args) const {
+      char* errorMessage = nullptr;
+      std::string formattedQuery = formatQuery(query, args...);
+      int rc = sqlite3_exec(db_, formattedQuery.c_str(), nullptr, nullptr, &errorMessage);
+      if (rc != SQLITE_OK) {
+          std::cerr << "SQLite error: " << errorMessage << std::endl;
+          sqlite3_free(errorMessage);
+      }
+  }
+
+  // Utility function to format SQL queries with parameters
+  template <typename... Args>
+  std::string formatQuery(const std::string& query, const Args&... args) const {
+      std::stringstream formattedQuery;
+      int argIndex = 0;
+      for (char ch : query) {
+          if (ch == '?') {
+              formattedQuery << argsToSql(args...)[argIndex++];
+          } else {
+              formattedQuery << ch;
+          }
+      }
+      return formattedQuery.str();
+  }
+
+  // Utility function to convert arguments to SQL string representations
+  template <typename... Args>
+  std::vector<std::string> argsToSql(const Args&... args) const {
+      return { toString(args)... };
+  }
+
+  // Utility function to convert a value to a string
+  template <typename T>
+  std::string toString(const T& value) const {
+      std::stringstream ss;
+      if constexpr (std::is_arithmetic<T>::value) {
+          ss << value;
+      } else {
+          ss << "'" << value << "'";
+      }
+      return ss.str();
+  }
 };
 
 class AnalyticsService {
   public: AnalyticsService(sqlite3 * db): db_(db) {}
 
   void getTotalEarned() {
-    std::cout << "Get total earned from orders\n";
+      // Implement logic to get total earned from orders
+      float totalEarned = fetchTotalEarned();
+      std::cout << "Total Earned: $" << totalEarned << std::endl;
   }
 
   void getTotalOrderCount() {
-    std::cout << "Get total count of orders\n";
+      // Implement logic to get total count of orders
+      int totalOrders = fetchTotalOrderCount();
+      std::cout << "Total Orders: " << totalOrders << std::endl;
   }
 
   private: sqlite3 * db_;
+  float fetchTotalEarned() {
+      float totalEarned = 0.0;
+      executeQuery("SELECT SUM(total_price) FROM Orders;", [&totalEarned](void* data, int argc, char** argv, char** /*azColName*/) -> int {
+          if (argc > 0 && argv[0] != nullptr) {
+              totalEarned = std::stof(argv[0]);
+          }
+          return 0;
+      });
+
+      return totalEarned;
+  }
+
+  int fetchTotalOrderCount() {
+      int totalOrders = 0;
+      executeQuery("SELECT COUNT(*) FROM Orders;", [&totalOrders](void* data, int argc, char** argv, char** /*azColName*/) -> int {
+          if (argc > 0 && argv[0] != nullptr) {
+              totalOrders = std::stoi(argv[0]);
+          }
+          return 0;
+      });
+
+      return totalOrders;
+  }
+  // Utility function to execute SQL queries
+  template <typename... Args>
+  void executeQuery(const std::string& query, const Args&... args) const {
+      char* errorMessage = nullptr;
+      int rc = sqlite3_exec(db_, query.c_str(), nullptr, nullptr, &errorMessage);
+      if (rc != SQLITE_OK) {
+          std::cerr << "SQLite error: " << errorMessage << std::endl;
+          sqlite3_free(errorMessage);
+      }
+  }
 };
 
 class StoreGateway {
@@ -153,8 +361,8 @@ class StoreGateway {
     int orderChoice;
     do {
       std::cout << "\nOrder Management\n";
-      std::cout << "1. Create Order\n";
-      std::cout << "2. Update Order Status\n";
+      std::cout << "1. Create new order\n";
+      std::cout << "2. Remove an order by id\n";
       std::cout << "3. List Orders\n";
       std::cout << "0. Back to Main Menu\n";
       std::cout << "Enter your choice: ";
@@ -165,7 +373,7 @@ class StoreGateway {
         orderService_ -> createOrder();
         break;
       case 2:
-        orderService_ -> updateStatus();
+        orderService_ -> removeOrder();
         break;
       case 3:
         orderService_ -> listOrders();
